@@ -32,6 +32,11 @@
 #include <poll.h>
 #include <assert.h>
 
+#ifdef __MACH__
+#include <mach/clock.h>
+#include <mach/mach.h>
+#endif
+
 #include "katz.h"
 
 /********************************************************************** 
@@ -147,6 +152,29 @@ void print_katzconn(struct katzconn *conn)
     fprintf(stderr, "--------------------\n");
 }
 
+ int katz_get_monotonic_time(struct timespec *now)
+ {
+    #ifdef __MACH__ 
+        clock_serv_t cclock;
+        mach_timespec_t mts;
+
+        host_get_clock_service(mach_host_self(), SYSTEM_CLOCK, &cclock);
+        clock_get_time(cclock, &mts);
+
+        if (clock_get_time(cclock, &mts) != 0)
+            return -1;
+
+        mach_port_deallocate(mach_task_self(), cclock);
+
+        now->tv_sec = mts.tv_sec;
+        now->tv_nsec = mts.tv_nsec;
+        
+    #else
+        if(katz_get_monotonic_time(&now) == -1)
+            return -1;
+    #endif
+    return 0;
+ }
 
 
 
@@ -379,6 +407,7 @@ inline void katzconn_insert_iq(struct katzconn *conn, char *data, int len, int s
     
 }
 
+
 /**
  * Check conn->oq for elements that need to be sent,
  * return pointer to queue element.
@@ -391,7 +420,8 @@ inline struct katzq *katzconn_getq(struct katzconn *conn)
     
     q = conn->oq;   // current queue element
 
-    if(clock_gettime(CLOCK_MONOTONIC, &now) == -1)
+
+    if(katz_get_monotonic_time(&now) == -1)
         err(1, "clock_gettime");
     
 
@@ -418,7 +448,7 @@ inline struct katzq *katzconn_getq(struct katzconn *conn)
     }
 
     if (q != NULL) {
-        clock_gettime(CLOCK_MONOTONIC, &q->sent);
+        katz_get_monotonic_time(&q->sent);
     }
 
 #ifdef DEBUG
@@ -500,7 +530,7 @@ inline int katzconn_keepalive(struct katzconn *conn)
     int s1, s2;
 #endif
 
-    if(clock_gettime(CLOCK_MONOTONIC, &now))
+    if(katz_get_monotonic_time(&now))
         err(1, "clock_gettime");
 
     //XXX: check for overflow
@@ -541,7 +571,7 @@ inline int smallest_oq_timeout (struct katzconn *conn)
         return 0;
     }
 
-    if(clock_gettime(CLOCK_MONOTONIC, &now))
+    if(katz_get_monotonic_time(&now))
         err(1, "clock_gettime");
 
     l = NULL;
@@ -715,7 +745,7 @@ int katz_process_out(struct katzconn *conn)
     if (ret == -1)
         errx(1, "katzpack_sendmsg failed");
     else {
-        if(clock_gettime(CLOCK_MONOTONIC, &conn->last_event))
+        if(katz_get_monotonic_time(&conn->last_event))
             err(1, "clock_gettime");
         if (conn->n_oq == 0) {
             debug("whole queue sent, disabling KSO\n");
@@ -750,7 +780,7 @@ int katz_process_in(struct katzconn *conn)
         return -1;
     }
 
-    if(clock_gettime(CLOCK_MONOTONIC, &conn->last_event))
+    if(katz_get_monotonic_time(&conn->last_event))
         err(1, "clock_gettime");
 
     // handle irregular packets
@@ -1096,7 +1126,7 @@ int katz_connect(struct katzconn *conn)
                 debug("not sending SYN reply\n");
             }
 
-            if(clock_gettime(CLOCK_MONOTONIC, &conn->last_event))
+            if(katz_get_monotonic_time(&conn->last_event))
                 err(1, "clock_gettime");
 
             return 1;

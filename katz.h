@@ -146,6 +146,7 @@ const char* event_name(int event);
 void print_katzq(struct katzq *q);
 void print_katzpack(struct katzpack *p);
 void print_katzconn(struct katzconn *conn);
+int katz_get_monotonic_time(struct timespec *now);
 
 inline struct katzq *free_katzq(struct katzq *q);
 inline void katzconn_process_ack(struct katzconn *conn, int ack);
