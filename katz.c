@@ -966,7 +966,7 @@ int connected_udp_socket(struct katzparm *kp)
         break;  /* okay we got one */
     }
     if (s == -1)
-        err(1, cause);
+        err(1, "%s", cause);
     freeaddrinfo(res0);
 
     return s;
@@ -1138,9 +1138,9 @@ int katz_connect(struct katzconn *conn)
 
     }
     if (custom_error == 0)
-        err(1, cause);
+        err(1, "%s", cause);
     else
-        errx(1, cause);
+        errx(1, "%s", cause);
 
     // vvv never reached vvv
 
